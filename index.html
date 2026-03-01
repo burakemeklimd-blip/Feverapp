@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fever Decision Support (MVP)</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin: 0; background:#f8fafc; color:#0f172a; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+    .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:16px; box-shadow:0 1px 1px rgba(15,23,42,.04); }
+    h1 { margin:0 0 6px; font-size:22px; }
+    .muted { color:#475569; font-size:13px; line-height:1.4; }
+    .row { display:grid; grid-template-columns: 1fr; gap:14px; }
+    @media(min-width: 880px){ .row { grid-template-columns: 1fr 1fr; } }
+    label { display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px; }
+    input, select { width:100%; padding:10px 12px; border:1px solid #cbd5e1; border-radius:12px; font-size:14px; background:#fff; }
+    .btns { display:flex; gap:10px; margin-top:10px; }
+    button { padding:10px 14px; border-radius:12px; border:1px solid #cbd5e1; background:#fff; font-weight:700; cursor:pointer; }
+    button.primary { background:#0f172a; color:#fff; border-color:#0f172a; }
+    button.primary:hover { background:#111c35; }
+    button:hover { background:#f1f5f9; }
+    .checks { display:grid; gap:8px; margin-top:6px; }
+    .check { display:flex; gap:10px; align-items:flex-start; }
+    .check input { width:auto; margin-top:3px; }
+    .pill { display:inline-flex; align-items:center; gap:8px; border-radius:999px; padding:6px 10px; font-weight:800; font-size:12px; border:1px solid; }
+    .pill.red { background:#fee2e2; border-color:#fecaca; color:#991b1b; }
+    .pill.amber { background:#fef3c7; border-color:#fde68a; color:#92400e; }
+    .pill.green { background:#d1fae5; border-color:#a7f3d0; color:#065f46; }
+    .box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px; }
+    ul { margin: 8px 0 0 18px; }
+    .error { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:10px 12px; border-radius:12px; font-size:13px; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .kpi { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px; }
+    .kpi .t { font-size:12px; color:#64748b; }
+    .kpi .v { font-size:18px; font-weight:900; margin-top:4px; }
+    .topbar { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .small { font-size:12px; color:#64748b; }
+    .divider { height:1px; background:#e2e8f0; margin:14px 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 id="title">Ateş Yönetim Karar Destek (MVP)</h1>
+        <div class="muted" id="subtitle">Bu araç bilgilendirme amaçlıdır; muayene ve hekim değerlendirmesi yerine geçmez.</div>
+      </div>
+      <div class="card" style="padding:12px 12px;">
+        <label id="langLabel" style="margin-bottom:6px;">Dil</label>
+        <select id="lang">
+          <option value="tr">TR</option>
+          <option value="en">EN</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:14px" class="card">
+      <div class="check">
+        <input type="checkbox" id="accept">
+        <div class="muted" id="disclaimerCheck">Okudum, anladım. Bu aracın genel bilgilendirme amaçlı olduğunu kabul ediyorum.</div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px;">
+      <!-- Inputs -->
+      <div class="card">
+        <h2 id="inputsTitle" style="margin:0 0 10px;font-size:16px;">Girdiler</h2>
+
+        <div style="display:grid; gap:12px;">
+          <div>
+            <label id="ageLabel">Yaş grubu</label>
+            <select id="ageBand">
+              <option value="0_3m">0–3 ay</option>
+              <option value="3_36m" selected>3–36 ay</option>
+              <option value="3plus">3 yaş+</option>
+            </select>
+          </div>
+
+          <div>
+            <label id="wLabel">Kilo (kg)</label>
+            <input id="weight" type="number" step="0.1" value="10" inputmode="decimal">
+          </div>
+
+          <div>
+            <label id="tLabel">Ateş (°C)</label>
+            <input id="temp" type="number" step="0.1" value="38.5" inputmode="decimal">
+          </div>
+
+          <div>
+            <label id="dLabel">Ateş süresi</label>
+            <select id="duration">
+              <option value="lt24">&lt;24 saat</option>
+              <option value="24_72">24–72 saat</option>
+              <option value="gt72">&gt;72 saat</option>
+            </select>
+          </div>
+
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#334155;" id="symptomsTitle">Eşlik eden bulgular</div>
+            <div class="checks" id="symptomList"></div>
+          </div>
+
+          <div id="err" class="error" style="display:none;"></div>
+
+          <div class="btns">
+            <button class="primary" id="calcBtn">Hesapla</button>
+            <button id="resetBtn">Sıfırla</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div class="card">
+        <h2 id="outTitle" style="margin:0 0 10px;font-size:16px;">Sonuç</h2>
+        <div class="muted" id="hint">Girdileri doldurup “Hesapla”ya basın.</div>
+
+        <div id="result" style="display:none; margin-top:10px;">
+          <div id="triagePill" class="pill green">YEŞİL — Evde izlem uygun olabilir</div>
+
+          <div class="box" style="margin-top:10px;">
+            <ul id="advice"></ul>
+          </div>
+
+          <div class="divider"></div>
+
+          <div>
+            <div style="font-weight:900;" id="doseTitle">Doz hesaplayıcı (genel)</div>
+            <div class="small" id="doseNote">Aşağıdaki hesaplama bilgilendirme amaçlıdır. Kullandığınız ilacın prospektüsünü ve hekim önerisini esas alın.</div>
+
+            <div style="display:grid; gap:12px; margin-top:10px;">
+              <!-- Paracetamol -->
+              <div class="box">
+                <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                  <div style="font-weight:900;" id="paraTitle">Parasetamol</div>
+                  <div class="small" id="paraInterval">Aralık: 4–6 saatte bir (günlük maksimumu aşmayın)</div>
+                </div>
+                <div style="margin-top:10px; display:grid; gap:10px;">
+                  <div>
+                    <label id="chooseSusp1">Süspansiyon seç</label>
+                    <select id="paraSusp">
+                      <option value="120">120 mg / 5 mL</option>
+                      <option value="160">160 mg / 5 mL</option>
+                    </select>
+                  </div>
+                  <div class="grid2">
+                    <div class="kpi">
+                      <div class="t" id="paraPerDose">Tek doz (15 mg/kg)</div>
+                      <div class="v"><span id="paraMg">0</span> <span id="mgLbl1">mg</span></div>
+                    </div>
+                    <div class="kpi">
+                      <div class="t" id="paraPerDose2">Tek doz</div>
+                      <div class="v"><span id="paraMl">0</span> <span id="mlLbl1">mL</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Ibuprofen -->
+              <div class="box">
+                <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                  <div style="font-weight:900;" id="ibuTitle">İbuprofen</div>
+                  <div class="small" id="ibuInterval">Aralık: 6–8 saatte bir (dehidratasyonda/şüphede kaçının)</div>
+                </div>
+                <div id="ibuWarn" class="error" style="display:none; margin-top:10px;"></div>
+                <div style="margin-top:10px; display:grid; gap:10px;">
+                  <div>
+                    <label id="chooseSusp2">Süspansiyon seç</label>
+                    <select id="ibuSusp">
+                      <option value="100">100 mg / 5 mL</option>
+                      <option value="200">200 mg / 5 mL</option>
+                    </select>
+                  </div>
+                  <div class="grid2">
+                    <div class="kpi">
+                      <div class="t" id="ibuPerDose">Tek doz (10 mg/kg)</div>
+                      <div class="v"><span id="ibuMg">0</span> <span id="mgLbl2">mg</span></div>
+                    </div>
+                    <div class="kpi">
+                      <div class="t" id="ibuPerDose2">Tek doz</div>
+                      <div class="v"><span id="ibuMl">0</span> <span id="mlLbl2">mL</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="small" id="noData">Bu MVP veri saklamaz. Kullanıcı girdileri tarayıcıda işlenir.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px" class="small" id="footerNote">
+          Not: Kural seti konservatif hazırlanmıştır. Klinik yaklaşımınıza göre özelleştirebiliriz.
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const COPY = {
+    tr: {
+      title: "Ateş Yönetim Karar Destek (MVP)",
+      subtitle: "Bu araç bilgilendirme amaçlıdır; muayene ve hekim değerlendirmesi yerine geçmez.",
+      langLabel: "Dil",
+      disclaimerCheck: "Okudum, anladım. Bu aracın genel bilgilendirme amaçlı olduğunu kabul ediyorum.",
+      inputsTitle: "Girdiler",
+      outTitle: "Sonuç",
+      hint: "Girdileri doldurup “Hesapla”ya basın.",
+      ageLabel: "Yaş grubu",
+      wLabel: "Kilo (kg)",
+      tLabel: "Ateş (°C)",
+      dLabel: "Ateş süresi",
+      symptomsTitle: "Eşlik eden bulgular",
+      calcBtn: "Hesapla",
+      resetBtn: "Sıfırla",
+      doseTitle: "Doz hesaplayıcı (genel)",
+      doseNote: "Aşağıdaki hesaplama bilgilendirme amaçlıdır. Kullandığınız ilacın prospektüsünü ve hekim önerisini esas alın.",
+      chooseSusp: "Süspansiyon seç",
+      paraTitle: "Parasetamol",
+      ibuTitle: "İbuprofen",
+      paraInterval: "Aralık: 4–6 saatte bir (günlük maksimumu aşmayın)",
+      ibuInterval: "Aralık: 6–8 saatte bir (dehidratasyonda/şüphede kaçının)",
+      paraPerDose: "Tek doz (15 mg/kg)",
+      ibuPerDose: "Tek doz (10 mg/kg)",
+      perDose2: "Tek doz",
+      mg: "mg",
+      ml: "mL",
+      noData: "Bu MVP veri saklamaz. Kullanıcı girdileri tarayıcıda işlenir.",
+      footerNote: "Not: Kural seti konservatif hazırlanmıştır. Klinik yaklaşımınıza göre özelleştirebiliriz.",
+      ibuWarn: "6 aydan küçüklerde ibuprofen kullanımı için hekime danışın.",
+      validation: {
+        needDisclaimer: "Devam etmek için onayı işaretleyin.",
+        weight: "Kilo 2–80 kg aralığında olmalı.",
+        temp: "Ateş 34–43 °C aralığında olmalı."
+      },
+      triage: {
+        red: "KIRMIZI — Acil değerlendirme önerilir",
+        amber: "SARI — Aynı gün hekim değerlendirmesi düşünülür",
+        green: "YEŞİL — Evde izlem uygun olabilir"
+      },
+      advice: {
+        red: [
+          "Acil servise başvuru / acil hekim değerlendirmesi önerilir.",
+          "Bilinç değişikliği, solunum sıkıntısı, morarma, peteşi/purpura gibi bulgular acildir."
+        ],
+        amber: [
+          "Aynı gün çocuk hekimi değerlendirmesi uygun olur.",
+          "Genel durum bozulursa veya yeni kırmızı bayrak gelişirse acile başvurun."
+        ],
+        green: [
+          "Genel durum iyi ise evde izlem yapılabilir.",
+          "Bol sıvı, hafif giydirme, ortam ısısını ılımlı tutma önerilir.",
+          "Ateş tek başına değil, çocuğun genel durumu önemlidir."
+        ]
+      },
+      ageBands: { "0_3m":"0–3 ay", "3_36m":"3–36 ay", "3plus":"3 yaş+" },
+      durations: { "lt24":"<24 saat", "24_72":"24–72 saat", "gt72":">72 saat" },
+      symptomLabels: {
+        poorGeneral: "Genel durum kötü / uyandırmak zor",
+        respDistress: "Solunum sıkıntısı",
+        cyanosis: "Morarma",
+        petechiae: "Peteşi/purpura benzeri döküntü",
+        neckStiffness: "Ense sertliği / şiddetli baş ağrısı / fotofobi",
+        cannotDrink: "Sıvı alamama / inatçı kusma",
+        dehydration: "Belirgin susuzluk bulguları (az idrar, ağız kuruluğu vb.)",
+        immunocompromised: "İmmünsüpresyon / ciddi kronik hastalık"
+      }
+    },
+    en: {
+      title: "Fever Decision Support (MVP)",
+      subtitle: "This tool is for general information only; it does not replace clinical evaluation or a physician’s assessment.",
+      langLabel: "Language",
+      disclaimerCheck: "I understand and agree this tool provides general information only.",
+      inputsTitle: "Inputs",
+      outTitle: "Result",
+      hint: "Fill in the inputs and click “Calculate”.",
+      ageLabel: "Age group",
+      wLabel: "Weight (kg)",
+      tLabel: "Temperature (°C)",
+      dLabel: "Fever duration",
+      symptomsTitle: "Associated features",
+      calcBtn: "Calculate",
+      resetBtn: "Reset",
+      doseTitle: "Dose calculator (general)",
+      doseNote: "The calculation below is for general information only. Follow product labeling and your clinician’s advice.",
+      chooseSusp: "Choose suspension",
+      paraTitle: "Paracetamol (Acetaminophen)",
+      ibuTitle: "Ibuprofen",
+      paraInterval: "Interval: every 4–6 hours (do not exceed daily maximum)",
+      ibuInterval: "Interval: every 6–8 hours (avoid if dehydrated / unsure)",
+      paraPerDose: "Per dose (15 mg/kg)",
+      ibuPerDose: "Per dose (10 mg/kg)",
+      perDose2: "Per dose",
+      mg: "mg",
+      ml: "mL",
+      noData: "This MVP stores no data. Inputs are processed in the browser.",
+      footerNote: "Note: Ruleset is intentionally conservative. We can tailor it to your protocol.",
+      ibuWarn: "For infants under 6 months, consult a clinician before ibuprofen.",
+      validation: {
+        needDisclaimer: "Please accept the disclaimer to continue.",
+        weight: "Weight must be between 2–80 kg.",
+        temp: "Temperature must be between 34–43 °C."
+      },
+      triage: {
+        red: "RED — Urgent evaluation recommended",
+        amber: "AMBER — Same-day clinician review advised",
+        green: "GREEN — Home monitoring may be appropriate"
+      },
+      advice: {
+        red: [
+          "Seek urgent medical care / emergency evaluation.",
+          "Altered mental status, breathing difficulty, cyanosis, petechiae/purpura are red flags."
+        ],
+        amber: [
+          "Same-day pediatric assessment is recommended.",
+          "Go to emergency care if red flags develop or condition worsens."
+        ],
+        green: [
+          "If overall condition is good, home monitoring can be reasonable.",
+          "Encourage fluids, light clothing, comfortable ambient temperature.",
+          "Overall appearance matters more than the number alone."
+        ]
+      },
+      ageBands: { "0_3m":"0–3 months", "3_36m":"3–36 months", "3plus":"3 years+" },
+      durations: { "lt24":"<24 hours", "24_72":"24–72 hours", "gt72":">72 hours" },
+      symptomLabels: {
+        poorGeneral: "Poor general condition / difficult to arouse",
+        respDistress: "Breathing difficulty",
+        cyanosis: "Bluish discoloration (cyanosis)",
+        petechiae: "Petechiae/purpura-like rash",
+        neckStiffness: "Neck stiffness / severe headache / photophobia",
+        cannotDrink: "Unable to drink / persistent vomiting",
+        dehydration: "Signs of dehydration (low urine, dry mouth, etc.)",
+        immunocompromised: "Immunocompromised / serious chronic condition"
+      }
+    }
+  };
+
+  const symptomKeys = [
+    "poorGeneral","respDistress","cyanosis","petechiae","neckStiffness","cannotDrink","dehydration","immunocompromised"
+  ];
+
+  let lang = "tr";
+
+  const $ = (id) => document.getElementById(id);
+
+  function roundTo(val, step){ return Math.round(val/step)*step; }
+  function doseToMl(mgDose, mgPer5mL){
+    const mgPerMl = mgPer5mL/5;
+    return mgDose / mgPerMl;
+  }
+
+  function computeTriage({ageBand, tempC, duration, symptoms}){
+    // RED: any red-flag symptom selected
+    if (symptomKeys.some(k => symptoms[k])) return "red";
+
+    // age under 3 months conservative rules
+    if (ageBand === "0_3m"){
+      if (tempC >= 38.0) return "red";
+      if (tempC >= 37.5) return "amber";
+    }
+
+    // high fever threshold conservative
+    if (tempC >= 40.0) return "amber";
+
+    // duration
+    if (duration === "gt72") return "amber";
+
+    // 3–36m threshold
+    if (ageBand === "3_36m" && tempC >= 39.0) return "amber";
+
+    return "green";
+  }
+
+  function renderSymptoms(){
+    const list = $("symptomList");
+    list.innerHTML = "";
+    const labels = COPY[lang].symptomLabels;
+    symptomKeys.forEach(key => {
+      const row = document.createElement("label");
+      row.className = "check";
+      row.innerHTML = `<input type="checkbox" id="sym_${key}"><div class="muted">${labels[key]}</div>`;
+      list.appendChild(row);
+    });
+  }
+
+  function setText(){
+    const t = COPY[lang];
+    document.documentElement.lang = lang;
+
+    $("title").textContent = t.title;
+    $("subtitle").textContent = t.subtitle;
+    $("langLabel").textContent = t.langLabel;
+    $("disclaimerCheck").textContent = t.disclaimerCheck;
+
+    $("inputsTitle").textContent = t.inputsTitle;
+    $("outTitle").textContent = t.outTitle;
+    $("hint").textContent = t.hint;
+
+    $("ageLabel").textContent = t.ageLabel;
+    $("wLabel").textContent = t.wLabel;
+    $("tLabel").textContent = t.tLabel;
+    $("dLabel").textContent = t.dLabel;
+    $("symptomsTitle").textContent = t.symptomsTitle;
+
+    $("calcBtn").textContent = t.calcBtn;
+    $("resetBtn").textContent = t.resetBtn;
+
+    $("doseTitle").textContent = t.doseTitle;
+    $("doseNote").textContent = t.doseNote;
+
+    $("chooseSusp1").textContent = t.chooseSusp;
+    $("chooseSusp2").textContent = t.chooseSusp;
+
+    $("paraTitle").textContent = t.paraTitle;
+    $("ibuTitle").textContent = t.ibuTitle;
+
+    $("paraInterval").textContent = t.paraInterval;
+    $("ibuInterval").textContent = t.ibuInterval;
+
+    $("paraPerDose").textContent = t.paraPerDose;
+    $("paraPerDose2").textContent = t.perDose2;
+    $("ibuPerDose").textContent = t.ibuPerDose;
+    $("ibuPerDose2").textContent = t.perDose2;
+
+    $("mgLbl1").textContent = t.mg;
+    $("mgLbl2").textContent = t.mg;
+    $("mlLbl1").textContent = t.ml;
+    $("mlLbl2").textContent = t.ml;
+
+    $("noData").textContent = t.noData;
+    $("footerNote").textContent = t.footerNote;
+
+    // update select option text for age/duration
+    const ageSel = $("ageBand");
+    [...ageSel.options].forEach(opt => opt.textContent = t.ageBands[opt.value]);
+    const durSel = $("duration");
+    [...durSel.options].forEach(opt => opt.textContent = t.durations[opt.value]);
+
+    renderSymptoms();
+  }
+
+  function getSymptomsState(){
+    const s = {};
+    symptomKeys.forEach(k => s[k] = $("sym_"+k).checked);
+    return s;
+  }
+
+  function validate(){
+    const t = COPY[lang];
+    if (!$("accept").checked) return t.validation.needDisclaimer;
+
+    const w = Number($("weight").value);
+    const tc = Number($("temp").value);
+    if (!(w >= 2 && w <= 80)) return t.validation.weight;
+    if (!(tc >= 34 && tc <= 43)) return t.validation.temp;
+    return null;
+  }
+
+  function updateDoses(){
+    const w = Number($("weight").value);
+    const paraSusp = Number($("paraSusp").value);
+    const ibuSusp  = Number($("ibuSusp").value);
+
+    const paraMgDose = roundTo(w * 15, 1);
+    const paraMl = roundTo(doseToMl(paraMgDose, paraSusp), 0.1);
+
+    const ibuMgDose = roundTo(w * 10, 1);
+    const ibuMl = roundTo(doseToMl(ibuMgDose, ibuSusp), 0.1);
+
+    $("paraMg").textContent = paraMgDose.toFixed(1).replace(/\.0$/,"");
+    $("paraMl").textContent = paraMl.toFixed(1).replace(/\.0$/,"");
+
+    $("ibuMg").textContent = ibuMgDose.toFixed(1).replace(/\.0$/,"");
+    $("ibuMl").textContent = ibuMl.toFixed(1).replace(/\.0$/,"");
+  }
+
+  function showResult(level){
+    const t = COPY[lang];
+
+    const pill = $("triagePill");
+    pill.classList.remove("red","amber","green");
+    pill.classList.add(level);
+    pill.textContent = t.triage[level];
+
+    const ul = $("advice");
+    ul.innerHTML = "";
+    t.advice[level].forEach(line => {
+      const li = document.createElement("li");
+      li.textContent = line;
+      ul.appendChild(li);
+    });
+
+    // ibuprofen warning under 6 months: we only have age bands. show warning for 0-3m.
+    const ageBand = $("ageBand").value;
+    const warn = $("ibuWarn");
+    if (ageBand === "0_3m") {
+      warn.style.display = "block";
+      warn.textContent = t.ibuWarn;
+    } else {
+      warn.style.display = "none";
+    }
+
+    updateDoses();
+    $("hint").style.display = "none";
+    $("result").style.display = "block";
+  }
+
+  function resetAll(){
+    $("accept").checked = false;
+    $("ageBand").value = "3_36m";
+    $("weight").value = "10";
+    $("temp").value = "38.5";
+    $("duration").value = "lt24";
+    symptomKeys.forEach(k => $("sym_"+k).checked = false);
+    $("paraSusp").value = "120";
+    $("ibuSusp").value = "100";
+    $("err").style.display = "none";
+    $("hint").style.display = "block";
+    $("result").style.display = "none";
+  }
+
+  // Init
+  $("lang").addEventListener("change", (e) => {
+    lang = e.target.value;
+    setText();
+  });
+
+  $("calcBtn").addEventListener("click", () => {
+    const err = validate();
+    if (err){
+      $("err").textContent = err;
+      $("err").style.display = "block";
+      $("result").style.display = "none";
+      return;
+    }
+    $("err").style.display = "none";
+
+    const ageBand = $("ageBand").value;
+    const tempC = Number($("temp").value);
+    const duration = $("duration").value;
+    const symptoms = getSymptomsState();
+
+    const level = computeTriage({ageBand, tempC, duration, symptoms});
+    showResult(level);
+  });
+
+  $("resetBtn").addEventListener("click", resetAll);
+
+  $("paraSusp").addEventListener("change", updateDoses);
+  $("ibuSusp").addEventListener("change", updateDoses);
+  $("weight").addEventListener("input", () => { if ($("result").style.display === "block") updateDoses(); });
+
+  // First render
+  setText();
+  updateDoses();
+</script>
+</body>
+</html>
